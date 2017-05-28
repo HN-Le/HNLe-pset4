@@ -1,31 +1,32 @@
 package com.example.hnle_pset4;
 
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-
-import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
-import android.widget.TextView;
-
 import java.util.ArrayList;
+
 
 public class MainActivity extends AppCompatActivity {
 
     DBHelper helper;
     Context context;
-    Task task;
     ArrayList<Task> taskList;
-    String task_name;
-
-    TextView tasks;
+    ArrayList<String> taskList_string = new ArrayList<>();
+    String status_task;
     ListView lvitems;
-
+    SharedPreferences prefs = null;
+    ArrayAdapter arrayAdapter;
 
 
     @Override
@@ -38,61 +39,187 @@ public class MainActivity extends AppCompatActivity {
         helper =  new DBHelper(this);
 
         lvitems = (ListView) findViewById(R.id.lvitems) ;
-        tasks = (TextView) findViewById(R.id.tasks) ;
-
-//
-//
-//        // Change the task and then update
-//        task.getTask_name();
-//        helper.update(task);
-//
-//        // Delete task from database
-//        helper.delete(task);
-//
-
 
         // Ask for a list of all tasks
         taskList = helper.read();
 
+        // Get tasks from object and put into a list
         for (Task task : taskList){
-            Log.d("TAAAAG", task.toString());
+            taskList_string.add(task.getTask_name());
         }
 
         makeListAdapter();
+
+        // Loop through task database
+        for (Task task: taskList){
+
+            // If task is done check the box
+            if (task.getTask_status().equals("DONE")) {
+                lvitems.setItemChecked(taskList.indexOf(task), true);
+            }
+
+            // If not, leave it unchecked
+            else {
+                lvitems.setItemChecked(taskList.indexOf(task), false);
+            }
+
+        }
+
+        // Listener for the short taps to change the status
+        lvitems.setOnItemClickListener(new Listener());
+
+        // Listener for the long taps on the task itself to delete
+        lvitems.setOnItemLongClickListener(new LongListener());
+
+        prefs = this.getSharedPreferences("settings", this.MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+
+        // First time use, show sample tasks
+        if (prefs.getBoolean("firstTime", true)){
+            helper.create("Tap the + to add a task!", "TODO");
+            helper.create("Tap on task to check/uncheck!", "TODO");
+            helper.create("Long tap to delete task!", "TODO");
+
+            // Only restart the main activity for first time use to show the sample tasks
+            restartFirstActivity();
+
+            // After first use remember for next times its not the first time
+            editor.putBoolean("firstTime", false);
+            editor.commit();
+
+        }
+    }
+
+    // Renders the menu in the main activity
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+     getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    // When + sign is pressed
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+            // Make an edit text for in the dialog
+            final EditText user_input = new EditText(this);
+
+
+            // Build dialog screen
+            AlertDialog dialog = new AlertDialog.Builder(this)
+                    .setMessage("Add a task")
+                    .setView(user_input)
+
+
+                    // Make an "Add" button
+                    .setPositiveButton("Add", new DialogInterface.OnClickListener() {
+
+                        // When pressed on the "Add" button of the dialog screen
+                        @Override
+                        public void onClick(DialogInterface dialog, int id) {
+
+                            // Get user input
+                            String task = String.valueOf(user_input.getText());
+
+                            // Store user input in the database
+                            helper.create(task, "TODO");
+
+                            // Restart the main activity to show the added task
+                            restartFirstActivity();
+                        }
+                    })
+
+                    // Make a "Cancel" button
+                    .setNegativeButton("Cancel", null)
+                    .create();
+
+            dialog.show();
+            return true;
+
     }
 
 
-    public void input(View view) {
-
-        EditText user_input = (EditText) findViewById(R.id.user_input);
-        task_name = user_input.getText().toString();
-
-
-        // Create a new task to store in the database
-        task = new Task(task_name, 0);
-
-        Log.d("tag4", task.toString());
-
-        // Create task in database
-        helper.create(task);
-
-        Log.d("tag4", task_name);
-        Log.d("tag4", task.toString());
-
-
-    }
-
+    // Make adapter to show the list
     public void makeListAdapter(){
 
-        lvitems = (ListView) findViewById(R.id.lvitems) ;
-        tasks = (TextView) findViewById(R.id.tasks);
+        // list view with checkboxes next to the text
+        arrayAdapter = new ArrayAdapter<>
+                (this, android.R.layout.simple_list_item_multiple_choice, android.R.id.text1, taskList);
 
-        ArrayAdapter arrayAdapter = new ArrayAdapter<>
-                (this, android.R.layout.simple_list_item_1, taskList);
+        lvitems = (ListView) findViewById(R.id.lvitems);
 
         assert lvitems != null;
         lvitems.setAdapter(arrayAdapter);
 
+        lvitems.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+
     }
 
+    // Onclick Listener for when an item has been clicked in the list
+    private class Listener implements AdapterView.OnItemClickListener{
+
+        // Listener to check the boxes (un check/ check)
+        @Override
+        public void onItemClick (AdapterView<?> parent, View view, int position, long id) {
+
+            // check the status of the task
+            status_task = taskList.get(position).getTask_status();
+
+            // If box is unchecked
+            if (status_task.equals("TODO")){
+                // Check the box
+                lvitems.setItemChecked(position, true);
+
+                // Change the status in object to DONE
+                taskList.get(position).setTask_status("DONE");
+            }
+
+            // If box is checked
+            else{
+                // Un check the box
+                lvitems.setItemChecked(position, false);
+
+                // Change the status in object to TO DO
+                taskList.get(position).setTask_status("TODO");
+            }
+
+            // Update the database
+            helper.update(taskList.get(position));
+
+        }
+
+    }
+
+    // Long Onclick listener for when an task is long pressed
+    private class LongListener implements AdapterView.OnItemLongClickListener{
+
+        public boolean onItemLongClick (AdapterView<?> parent, View view, int position, long id) {
+
+            // Delete from database
+            helper.delete(taskList.get(position));
+
+            // Delete from arraylist
+            taskList_string.remove(position);
+
+            helper.read();
+
+            // Delete object
+            taskList.remove(position);
+
+            // notify adapter that list view was changed
+            arrayAdapter.notifyDataSetChanged();
+
+            return true;
+        }
+    }
+
+    // Restart the main activity
+    private void restartFirstActivity()
+    {
+        Intent i = getBaseContext().getPackageManager()
+                .getLaunchIntentForPackage(getBaseContext().getPackageName() );
+
+        i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK );
+        startActivity(i);
+    }
 }

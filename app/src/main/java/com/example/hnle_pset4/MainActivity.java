@@ -16,13 +16,11 @@ import android.widget.EditText;
 import android.widget.ListView;
 import java.util.ArrayList;
 
-
 public class MainActivity extends AppCompatActivity {
 
     DBHelper helper;
     Context context;
     ArrayList<Task> taskList;
-    ArrayList<String> taskList_string = new ArrayList<>();
     String status_task;
     ListView lvitems;
     SharedPreferences prefs = null;
@@ -42,11 +40,6 @@ public class MainActivity extends AppCompatActivity {
 
         // Ask for a list of all tasks
         taskList = helper.read();
-
-        // Get tasks from object and put into a list
-        for (Task task : taskList){
-            taskList_string.add(task.getTask_name());
-        }
 
         makeListAdapter();
 
@@ -197,9 +190,6 @@ public class MainActivity extends AppCompatActivity {
 
             // Delete from database
             helper.delete(taskList.get(position));
-
-            // Delete from arraylist
-            taskList_string.remove(position);
 
             helper.read();
 
